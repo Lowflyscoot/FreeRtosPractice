@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "cmsis_os.h"
+#include "LCD.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -56,104 +57,31 @@ void StartDefaultTask(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-enum segments
-{
-	segA,
-	segB,
-	segC,
-	segD,
-	segE,
-	segF,
-	segG,
-	segP
-};
 
-uint8_t SnakeAnimationArray [] = {
-	0b01000011,
-	0b01010010,
-	0b01011000,
-	0b00011100,
-	0b01001100,
-	0b01100100,
-	0b01100001,
-};
+//void blinkTask1 (void* pvParameters)
+//{
+//	for(;;)
+//	{
+//		SetFrame(currentFrame);
+//		vTaskDelay((33 / portTICK_PERIOD_MS));
+//	}
+//}
+//
+//void blinkTask2 (void* pvParameters)
+//{
+//	uint8_t numOfFrame = 0;
+//	for(;;)
+//	{
+//		currentFrame = SnakeAnimationArray[numOfFrame];
+//		numOfFrame++;
+//		if (numOfFrame == sizeof(SnakeAnimationArray))
+//		{
+//			numOfFrame = 0;
+//		}
+//		vTaskDelay((200 / portTICK_PERIOD_MS));
+//	}
+//}
 
-uint8_t currentFrame = 0b00000000;
-
-void SetSegment (uint8_t numOfSegment, GPIO_PinState state)
-{
-	GPIO_PinState pinAction;
-	if (state == 0)
-	{
-		pinAction = GPIO_PIN_RESET;
-	}
-	else
-	{
-		pinAction = GPIO_PIN_SET;
-	}
-
-	switch (numOfSegment)
-	{
-		case 1:
-			HAL_GPIO_WritePin(SSEG_A_GPIO_Port, SSEG_A_Pin, pinAction);
-			break;
-		case 2:
-			HAL_GPIO_WritePin(SSEG_B_GPIO_Port, SSEG_B_Pin, pinAction);
-			break;
-		case 3:
-			HAL_GPIO_WritePin(SSEG_C_GPIO_Port, SSEG_C_Pin, pinAction);
-			break;
-		case 4:
-			HAL_GPIO_WritePin(SSEG_D_GPIO_Port, SSEG_D_Pin, pinAction);
-			break;
-		case 5:
-			HAL_GPIO_WritePin(SSEG_E_GPIO_Port, SSEG_E_Pin, pinAction);
-			break;
-		case 6:
-			HAL_GPIO_WritePin(SSEG_F_GPIO_Port, SSEG_F_Pin, pinAction);
-			break;
-		case 7:
-			HAL_GPIO_WritePin(SSEG_G_GPIO_Port, SSEG_G_Pin, pinAction);
-			break;
-		case 8:
-			HAL_GPIO_WritePin(SSEG_P_GPIO_Port, SSEG_P_Pin, pinAction);
-			break;
-		default:
-			break;
-	}
-}
-
-void SetFrame (uint8_t frame)
-{
-	for (uint8_t i = 0; i < 8; i++)
-	{
-		SetSegment(8 - i, ((frame >> (7 - i)) & 0x01));
-	}
-}
-
-void blinkTask1 (void* pvParameters)
-{
-	for(;;)
-	{
-		SetFrame(currentFrame);
-		vTaskDelay((33 / portTICK_PERIOD_MS));
-	}
-}
-
-void blinkTask2 (void* pvParameters)
-{
-	uint8_t numOfFrame = 0;
-	for(;;)
-	{
-		currentFrame = SnakeAnimationArray[numOfFrame];
-		numOfFrame++;
-		if (numOfFrame == sizeof(SnakeAnimationArray))
-		{
-			numOfFrame = 0;
-		}
-		vTaskDelay((200 / portTICK_PERIOD_MS));
-	}
-}
 /* USER CODE END 0 */
 
 /**
@@ -172,7 +100,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  LCD_Init();
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -210,8 +138,10 @@ int main(void)
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  xTaskCreate(blinkTask1, "LED", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
-  xTaskCreate(blinkTask2, "LED", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
+
+  // xTaskCreate(blinkTask1, "LED", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
+  // xTaskCreate(blinkTask2, "LED", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
+  
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
