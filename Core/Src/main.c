@@ -40,6 +40,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 
@@ -48,6 +50,7 @@ osThreadId defaultTaskHandle;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_ADC1_Init(void);
 void StartDefaultTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
@@ -78,7 +81,20 @@ uint8_t SnakeAnimationArray [] = {
 	0b01100001,
 };
 
-uint8_t currentFrame = 0b00000000;
+uint8_t SsegNumbersArray [] = {
+	0b00111111, // 0
+	0b00000110, // 1
+	0b01011011, // 2
+	0b01001111, // 3
+	0b01100110, // 4
+	0b01101101, // 5
+	0b01111101, // 6
+	0b00000111, // 7
+	0b01111111, // 8
+	0b01101111, // 9
+};
+
+uint8_t currentFrame [4] = {0, 0, 0, 0};
 
 void SetSegment (uint8_t numOfSegment, GPIO_PinState state)
 {
@@ -116,44 +132,77 @@ void SetSegment (uint8_t numOfSegment, GPIO_PinState state)
 			HAL_GPIO_WritePin(SSEG_G_GPIO_Port, SSEG_G_Pin, pinAction);
 			break;
 		case 8:
-			HAL_GPIO_WritePin(SSEG_P_GPIO_Port, SSEG_P_Pin, pinAction);
+			HAL_GPIO_WritePin(SSEG_DOT_GPIO_Port, SSEG_DOT_Pin, pinAction);
 			break;
 		default:
 			break;
 	}
 }
 
-void SetFrame (uint8_t frame)
+void SetFrame (uint8_t frameNum, uint8_t frame)
 {
-	for (uint8_t i = 0; i < 8; i++)
-	{
-		SetSegment(8 - i, ((frame >> (7 - i)) & 0x01));
-	}
+  HAL_GPIO_WritePin(SSEG_1_GPIO_Port, SSEG_1_Pin, 1);
+  HAL_GPIO_WritePin(SSEG_2_GPIO_Port, SSEG_2_Pin, 1);
+  HAL_GPIO_WritePin(SSEG_3_GPIO_Port, SSEG_3_Pin, 1);
+  HAL_GPIO_WritePin(SSEG_4_GPIO_Port, SSEG_4_Pin, 1);
+
+   switch(frameNum)
+   {
+     case 0:
+       HAL_GPIO_WritePin(SSEG_1_GPIO_Port, SSEG_1_Pin, 0);
+       break;
+     case 1:
+       HAL_GPIO_WritePin(SSEG_2_GPIO_Port, SSEG_2_Pin, 0);
+       break;
+     case 2:
+       HAL_GPIO_WritePin(SSEG_3_GPIO_Port, SSEG_3_Pin, 0);
+       break;
+     case 3:
+       HAL_GPIO_WritePin(SSEG_4_GPIO_Port, SSEG_4_Pin, 0);
+       break;
+     default:
+       break;
+   }
+	 for (uint8_t i = 0; i < 8; i++)
+	 {
+	 	SetSegment(8 - i, ((frame >> (7 - i)) & 0x01));
+	 }
 }
 
-void blinkTask1 (void* pvParameters)
+void ssegOutputTask (void* pvParameters)
 {
+  uint8_t Frame = 0;
 	for(;;)
 	{
-		SetFrame(currentFrame);
-		vTaskDelay((33 / portTICK_PERIOD_MS));
+    SetFrame(Frame, currentFrame[Frame]);
+    Frame++;
+    if (Frame == 4)
+    {
+    	Frame = 0;
+    }
+
+    vTaskDelay((3 / portTICK_PERIOD_MS));
 	}
 }
 
-void blinkTask2 (void* pvParameters)
+void framesUpdateTask (void* pvParameters)
 {
 	uint8_t numOfFrame = 0;
 	for(;;)
 	{
-		currentFrame = SnakeAnimationArray[numOfFrame];
-		numOfFrame++;
-		if (numOfFrame == sizeof(SnakeAnimationArray))
-		{
-			numOfFrame = 0;
-		}
-		vTaskDelay((200 / portTICK_PERIOD_MS));
+    for(uint8_t i = 0; i < 4; i++)
+    {
+      currentFrame[i] = SsegNumbersArray[numOfFrame];
+    }
+    numOfFrame++;
+    if (numOfFrame == sizeof(SsegNumbersArray))
+    {
+      numOfFrame = 0;
+    }
+		vTaskDelay((1000 / portTICK_PERIOD_MS));
 	}
 }
+
 /* USER CODE END 0 */
 
 /**
@@ -184,6 +233,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -210,8 +260,8 @@ int main(void)
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  xTaskCreate(blinkTask1, "LED", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
-  xTaskCreate(blinkTask2, "LED", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
+  xTaskCreate(ssegOutputTask, "LED", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
+  xTaskCreate(framesUpdateTask, "LED", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
@@ -238,6 +288,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
@@ -264,6 +315,59 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV2;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_9;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -277,18 +381,19 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(BOARD_LED_GPIO_Port, BOARD_LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SSEG_E_GPIO_Port, SSEG_E_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, SSEG_G_Pin|SSEG_C_Pin|SSEG_DOT_Pin|SSEG_D_Pin
+                          |SSEG_2_Pin|SSEG_B_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SSEG_D_Pin|SSEG_C_Pin|SSEG_P_Pin|SSEG_A_Pin
-                          |SSEG_B_Pin|SSEG_F_Pin|SSEG_G_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, SSEG_E_Pin|SSEG_4_Pin|SSEG_1_Pin|SSEG_A_Pin
+                          |SSEG_F_Pin|SSEG_3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : BOARD_LED_Pin */
   GPIO_InitStruct.Pin = BOARD_LED_Pin;
@@ -297,21 +402,23 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(BOARD_LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : SSEG_E_Pin */
-  GPIO_InitStruct.Pin = SSEG_E_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(SSEG_E_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : SSEG_D_Pin SSEG_C_Pin SSEG_P_Pin SSEG_A_Pin
-                           SSEG_B_Pin SSEG_F_Pin SSEG_G_Pin */
-  GPIO_InitStruct.Pin = SSEG_D_Pin|SSEG_C_Pin|SSEG_P_Pin|SSEG_A_Pin
-                          |SSEG_B_Pin|SSEG_F_Pin|SSEG_G_Pin;
+  /*Configure GPIO pins : SSEG_G_Pin SSEG_C_Pin SSEG_DOT_Pin SSEG_D_Pin
+                           SSEG_2_Pin SSEG_B_Pin */
+  GPIO_InitStruct.Pin = SSEG_G_Pin|SSEG_C_Pin|SSEG_DOT_Pin|SSEG_D_Pin
+                          |SSEG_2_Pin|SSEG_B_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SSEG_E_Pin SSEG_4_Pin SSEG_1_Pin SSEG_A_Pin
+                           SSEG_F_Pin SSEG_3_Pin */
+  GPIO_InitStruct.Pin = SSEG_E_Pin|SSEG_4_Pin|SSEG_1_Pin|SSEG_A_Pin
+                          |SSEG_F_Pin|SSEG_3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 
