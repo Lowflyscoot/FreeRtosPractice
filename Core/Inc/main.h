@@ -59,8 +59,6 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define BOARD_LED_Pin GPIO_PIN_13
 #define BOARD_LED_GPIO_Port GPIOC
-#define ADC1_POT_Pin GPIO_PIN_1
-#define ADC1_POT_GPIO_Port GPIOB
 #define SSEG_G_Pin GPIO_PIN_12
 #define SSEG_G_GPIO_Port GPIOB
 #define SSEG_C_Pin GPIO_PIN_13
@@ -87,6 +85,11 @@ void Error_Handler(void);
 #define SSEG_2_GPIO_Port GPIOB
 #define SSEG_B_Pin GPIO_PIN_4
 #define SSEG_B_GPIO_Port GPIOB
+#define EXTI_ECHO_Pin GPIO_PIN_5
+#define EXTI_ECHO_GPIO_Port GPIOB
+#define EXTI_ECHO_EXTI_IRQn EXTI9_5_IRQn
+#define ECHO_TRIGGER_Pin GPIO_PIN_6
+#define ECHO_TRIGGER_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
